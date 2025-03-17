@@ -1,18 +1,17 @@
-// backend/config/llm.js
 const axios = require('axios');
 
-// Initialize Grok client configuration
-const grokApiKey = process.env.GROK_API_KEY;
-const grokApiUrl = process.env.GROK_API_URL || 'https://api.grok.ai/v1';
+// Initialize Groq client configuration
+const groqApiKey = "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"; // Replace with your actual Groq API key
+const groqApiUrl = 'https://api.groq.com/openai/v1';
 
-// Helper function to call Grok API
-const callGrokApi = async (messages, options = {}) => {
+// Helper function to call Groq API
+const callGroqApi = async (messages, options = {}) => {
   try {
     const response = await axios.post(
-      `${grokApiUrl}/chat/completions`,
+      `${groqApiUrl}/chat/completions`,
       {
         messages,
-        model: process.env.GROK_MODEL || 'grok-2', // Use your specific Grok model
+        model: 'mixtral-8x7b-32768', // Use a valid Groq model
         max_tokens: options.max_tokens || 1000,
         temperature: options.temperature || 0.7,
         stream: false
@@ -20,14 +19,14 @@ const callGrokApi = async (messages, options = {}) => {
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${grokApiKey}`
+          'Authorization': `Bearer ${groqApiKey}`
         }
       }
     );
     
     return response.data;
   } catch (error) {
-    console.error('Error calling Grok API:', error.response?.data || error.message);
+    console.error('Error calling Groq API:', error.response?.data || error.message);
     throw error;
   }
 };
@@ -59,7 +58,7 @@ const DECISION_CRITERIA = {
 };
 
 module.exports = {
-  callGrokApi,
+  callGroqApi,
   SYSTEM_PROMPTS,
   DECISION_CRITERIA
 };

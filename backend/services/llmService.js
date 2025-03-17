@@ -1,5 +1,5 @@
 // backend/services/llmService.js
-const { callGrokApi, SYSTEM_PROMPTS, DECISION_CRITERIA } = require('../config/llm');
+const { callGroqApi, SYSTEM_PROMPTS, DECISION_CRITERIA } = require('../config/llm');
 const Chat = require('../models/Chat');
 const Inquiry = require('../models/Inquiry');
 const { getRelevantDocuments } = require('./ragService');
@@ -32,222 +32,100 @@ const processIncomingMessage = async (jid, message) => {
   } catch (error) {
     console.error('Error processing message with LLM:', error);
     
-    // Return fallback response
-    const fallbackResponse = "I'm having trouble processing your request right now. Please try again in a moment or ask to speak with a human agent if this continues.";
+    const fallbackResponse = "I'm having trouble processing your request right now. Please try again later or speak with a human agent.";
     await addMessageToChat(jid, 'bot', fallbackResponse);
     
     return fallbackResponse;
   }
 };
 
-// Get chat history for a JID
 const getChatHistory = async (jid, limit = 20) => {
   try {
-    // Find most recent chat session
-    const chat = await Chat.findOne({ jid })
-      .sort({ lastUpdated: -1 })
-      .select('messages')
-      .limit(1);
-    
-    if (!chat) {
-      return [];
-    }
-    
-    // Return last X messages in chronological order
-    return chat.messages.slice(-limit);
+    const chat = await Chat.findOne({ jid }).sort({ lastUpdated: -1 }).select('messages').limit(1);
+    return chat ? chat.messages.slice(-limit) : [];
   } catch (error) {
     console.error('Error getting chat history:', error);
     return [];
   }
 };
 
-// Add a message to chat history
 const addMessageToChat = async (jid, role, content) => {
   try {
-    // Find or create chat session
-    let chat = await Chat.findOne({ jid, conversationStatus: { $ne: 'ended' } })
-      .sort({ lastUpdated: -1 })
-      .limit(1);
-    
+    let chat = await Chat.findOne({ jid, conversationStatus: { $ne: 'ended' } }).sort({ lastUpdated: -1 }).limit(1);
     if (!chat) {
-      // Create new chat session
-      chat = new Chat({
-        jid,
-        messages: [],
-        conversationStatus: 'active'
-      });
+      chat = new Chat({ jid, messages: [], conversationStatus: 'active' });
     }
-    
-    // Add message to chat
-    chat.messages.push({
-      role,
-      content,
-      timestamp: new Date()
-    });
-    
-    // Update last updated timestamp
+    chat.messages.push({ role, content, timestamp: new Date() });
     chat.lastUpdated = new Date();
-    
-    // Save chat
     await chat.save();
     return chat;
   } catch (error) {
     console.error('Error adding message to chat:', error);
-    throw error;
   }
 };
 
-// Prepare conversation context for LLM
 const prepareConversationContext = (chatHistory, relevantDocs) => {
-  // Convert chat history to LLM format
-  const messages = chatHistory.map(msg => ({
-    role: msg.role === 'bot' ? 'assistant' : msg.role,
-    content: msg.content
-  }));
-  
-  // Add system prompt
-  messages.unshift({
-    role: 'system',
-    content: SYSTEM_PROMPTS.default
-  });
-  
-  // Add relevant documents if available
-  if (relevantDocs && relevantDocs.length > 0) {
-    const docContent = relevantDocs.map(doc => doc.content).join('\n\n');
-    messages.unshift({
-      role: 'system',
-      content: `Reference information: ${docContent}`
-    });
+  const messages = chatHistory.map(msg => ({ role: msg.role === 'bot' ? 'assistant' : msg.role, content: msg.content }));
+  messages.unshift({ role: 'system', content: SYSTEM_PROMPTS.default });
+  if (relevantDocs.length > 0) {
+    messages.unshift({ role: 'system', content: `Reference information: ${relevantDocs.map(doc => doc.content).join('\n\n')}` });
   }
-  
   return messages;
 };
 
-// Get response from LLM
 const getLLMResponse = async (jid, message, conversationContext) => {
   try {
-    // Add decision-making prompt to context
     const contextWithDecision = [
       ...conversationContext,
-      {
-        role: 'user',
-        content: message
-      },
-      {
-        role: 'system',
-        content: `
-        Based on this conversation, decide if you should:
-        1. Continue the conversation normally
-        2. End the conversation as the request is resolved
-        3. Escalate to human intervention
-        
-        If human intervention is needed, categorize as one of:
-        - "Service Appointment Issue"
-        - "Test Drive Inquiry"
-        - "Roadside Emergency"
-        - "Other"
-        
-        Format your response as follows:
-        DECISION: [continue|end|humanIntervention]
-        CATEGORY: [category if humanIntervention, otherwise "none"]
-        MESSAGE: [your response to the user]
-        `
-      }
+      { role: 'user', content: message },
+      { role: 'system', content: `\nBased on this conversation, decide:\n1. Continue normally\n2. End conversation\n3. Escalate to human intervention\nCATEGORY: ["Service", "Test Drive", "Emergency", "Other"]\nFORMAT: DECISION: [continue|end|humanIntervention]\nCATEGORY: [category]\nMESSAGE: [response]` }
     ];
     
-    // Call Grok LLM
-    const completion = await callGrokApi(contextWithDecision, {
-      max_tokens: 1000,
-      temperature: 0.7
-    });
-    
-    // Parse response
-    const llmOutput = completion.choices[0].message.content;
-    const parsed = parseLLMResponse(llmOutput);
-    
-    return parsed;
+    const completion = await callGroqApi(contextWithDecision, { max_tokens: 1000, temperature: 0.7 });
+    return parseLLMResponse(completion.choices[0].message.content);
   } catch (error) {
     console.error('Error getting LLM response:', error);
-    // Return default response
-    return {
-      decision: 'continue',
-      category: 'none',
-      message: "I'm having trouble processing your request. How else can I help you?"
-    };
+    return { decision: 'continue', category: 'none', message: "I'm having trouble processing your request." };
   }
 };
 
-// Parse LLM response to extract decision, category, and message
 const parseLLMResponse = (llmOutput) => {
   try {
-    // Default values
-    let decision = 'continue';
-    let category = 'none';
-    let message = llmOutput;
-    
-    // Try to extract structured format
+    let decision = 'continue', category = 'none', message = llmOutput;
     const decisionMatch = llmOutput.match(/DECISION:\s*(continue|end|humanIntervention)/i);
-    const categoryMatch = llmOutput.match(/CATEGORY:\s*(Service Appointment Issue|Test Drive Inquiry|Roadside Emergency|Other|none)/i);
-    const messageMatch = llmOutput.match(/MESSAGE:\s*(.+)(?:\n|$)/is);
-    
+    const categoryMatch = llmOutput.match(/CATEGORY:\s*(Service|Test Drive|Emergency|Other|none)/i);
+    const messageMatch = llmOutput.match(/MESSAGE:\s*(.+)/is);
     if (decisionMatch) decision = decisionMatch[1].toLowerCase();
     if (categoryMatch) category = categoryMatch[1];
     if (messageMatch) message = messageMatch[1].trim();
-    
     return { decision, category, message };
   } catch (error) {
     console.error('Error parsing LLM response:', error);
-    // Return defaults
-    return {
-      decision: 'continue',
-      category: 'none',
-      message: llmOutput
-    };
+    return { decision: 'continue', category: 'none', message: llmOutput };
   }
 };
 
-// Handle conversation decision
 const handleConversationDecision = async (jid, decision, category, lastUserMessage) => {
   try {
-    // Get the current chat
-    const chat = await Chat.findOne({ jid, conversationStatus: { $ne: 'ended' } })
-      .sort({ lastUpdated: -1 })
-      .limit(1);
-    
+    const chat = await Chat.findOne({ jid, conversationStatus: { $ne: 'ended' } }).sort({ lastUpdated: -1 }).limit(1);
     if (!chat) return;
-    
     if (decision === 'end') {
-      // End the conversation
       chat.conversationStatus = 'ended';
-      await chat.save();
-      
     } else if (decision === 'humanIntervention') {
-      // Escalate to human intervention
       chat.conversationStatus = 'escalated';
-      await chat.save();
-      
-      // Create inquiry
-      const inquiry = new Inquiry({
+      await Inquiry.create({
         jid,
         chatId: chat._id,
         category: category !== 'none' ? category : 'Other',
         status: 'open',
-        priority: category === 'Roadside Emergency' ? 'urgent' : 'medium',
-        summary: `Customer needs help with: ${lastUserMessage.substring(0, 100)}...`
+        priority: category === 'Emergency' ? 'urgent' : 'medium',
+        summary: `User needs help with: ${lastUserMessage.substring(0, 100)}...`
       });
-      
-      await inquiry.save();
     }
-    
-    // For 'continue', no action needed
-    
+    await chat.save();
   } catch (error) {
     console.error('Error handling conversation decision:', error);
   }
 };
 
-module.exports = {
-  processIncomingMessage,
-  getChatHistory,
-  addMessageToChat
-};
+module.exports = { processIncomingMessage, getChatHistory, addMessageToChat };

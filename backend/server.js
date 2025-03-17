@@ -12,6 +12,7 @@ const inquiryRoutes = require('./routes/inquiryRoutes');
 
 // Initialize WhatsApp service
 const { initWhatsApp } = require('./services/baileys');
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/whatsapp-chatbot';
 
 // Load environment variables
 dotenv.config();
@@ -26,7 +27,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(MONGODB_URI)
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
