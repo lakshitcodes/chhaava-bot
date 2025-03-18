@@ -1,26 +1,44 @@
 // frontend/src/components/UserManagement.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiSend, FiPlus, FiCheck, FiX } from 'react-icons/fi';
+import { FiSend, FiPlus, FiCheck, FiX, FiUsers, FiMessageSquare, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 import { API_URL } from '../config';
 
 const UserManagement = () => {
   const [newUser, setNewUser] = useState({
     jid: '',
     name: '',
-    isGroup: false
+    isGroup: false,
+    isActive: true  // Added isActive field
   });
   
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [broadcastFilter, setBroadcastFilter] = useState({
     isGroup: false,
+    isActive: true,  // Only broadcast to active JIDs by default
     tags: []
   });
   
+  const [activeJids, setActiveJids] = useState([]);
   const [selectedJids, setSelectedJids] = useState([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [broadcastLoading, setBroadcastLoading] = useState(false);
+  
+  // Fetch active JIDs for broadcasting
+  useEffect(() => {
+    const fetchActiveJids = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/api/users/active-jids`);
+        setActiveJids(res.data.data || []);
+      } catch (error) {
+        console.error('Error fetching active JIDs:', error);
+      }
+    };
+    
+    fetchActiveJids();
+  }, []);
   
   // Handle new user change
   const handleNewUserChange = (e) => {
@@ -53,11 +71,18 @@ const UserManagement = () => {
       setNewUser({
         jid: '',
         name: '',
-        isGroup: false
+        isGroup: false,
+        isActive: true
       });
       
       setSuccess(`User ${res.data.data.jid} added successfully!`);
       setLoading(false);
+      
+      // If new user is active, refresh the active JIDs list
+      if (newUser.isActive) {
+        const activeRes = await axios.get(`${API_URL}/api/users/active-jids`);
+        setActiveJids(activeRes.data.data || []);
+      }
     } catch (error) {
       setError(error.response?.data?.error || 'Error adding user');
       setLoading(false);
@@ -74,7 +99,7 @@ const UserManagement = () => {
     }
     
     try {
-      setLoading(true);
+      setBroadcastLoading(true);
       setError('');
       setSuccess('');
       
@@ -100,10 +125,10 @@ const UserManagement = () => {
       setSelectedJids([]);
       
       setSuccess(`Broadcast sent to ${res.data.results.filter(r => r.success).length} recipients!`);
-      setLoading(false);
+      setBroadcastLoading(false);
     } catch (error) {
       setError(error.response?.data?.error || 'Error sending broadcast');
-      setLoading(false);
+      setBroadcastLoading(false);
     }
   };
   
@@ -177,6 +202,22 @@ const UserManagement = () => {
               <label htmlFor="isGroup">This is a group</label>
             </div>
             
+            <div className="form-group checkbox">
+              <input
+                type="checkbox"
+                id="isActive"
+                name="isActive"
+                checked={newUser.isActive}
+                onChange={handleNewUserChange}
+                disabled={loading}
+              />
+              <label htmlFor="isActive">Enable bot to respond to this JID</label>
+              <small>
+                If checked, the bot will automatically respond to messages from this user/group.
+                {newUser.isGroup && " For groups, the bot will only respond when explicitly mentioned or replied to."}
+              </small>
+            </div>
+            
             <button 
               type="submit" 
               className="submit-button"
@@ -201,7 +242,7 @@ const UserManagement = () => {
                 placeholder="Type your broadcast message here..."
                 rows={4}
                 required
-                disabled={loading}
+                disabled={broadcastLoading}
               />
             </div>
             
@@ -214,13 +255,13 @@ const UserManagement = () => {
                   <div className="radio-option">
                     <input
                       type="radio"
-                      id="allUsers"
+                      id="allActiveUsers"
                       name="recipientType"
                       checked={selectedJids.length === 0}
                       onChange={() => setSelectedJids([])}
-                      disabled={loading}
+                      disabled={broadcastLoading}
                     />
-                    <label htmlFor="allUsers">All active users</label>
+                    <label htmlFor="allActiveUsers">All bot-enabled users ({activeJids.length})</label>
                   </div>
                   
                   <div className="radio-option">
@@ -229,26 +270,40 @@ const UserManagement = () => {
                       id="specificUsers"
                       name="recipientType"
                       checked={selectedJids.length > 0}
-                      onChange={() => setSelectedJids(['dummy'])} // Just to indicate selection
-                      disabled={loading}
+                      onChange={() => setSelectedJids(activeJids.map(item => item.jid))}
+                      disabled={broadcastLoading}
                     />
-                    <label htmlFor="specificUsers">Specific users/groups</label>
+                    <label htmlFor="specificUsers">Select specific users/groups</label>
                   </div>
                 </div>
               </div>
               
               {selectedJids.length > 0 && (
                 <div className="form-group">
-                  <label htmlFor="selectedJids">Enter JIDs (one per line)</label>
-                  <textarea
-                    id="selectedJids"
-                    name="selectedJids"
-                    value={selectedJids.join('\n')}
-                    onChange={(e) => setSelectedJids(e.target.value.split('\n').filter(jid => jid.trim()))}
-                    placeholder="Enter JIDs one per line"
-                    rows={3}
-                    disabled={loading}
-                  />
+                  <label htmlFor="selectedJidsSelect">Select Recipients</label>
+                  <select
+                    id="selectedJidsSelect"
+                    multiple
+                    size={Math.min(10, activeJids.length)}
+                    value={selectedJids}
+                    onChange={(e) => {
+                      const selected = Array.from(e.target.selectedOptions, option => option.value);
+                      setSelectedJids(selected);
+                    }}
+                    disabled={broadcastLoading}
+                    className="jid-select"
+                  >
+                    {activeJids.map(item => (
+                      <option key={item.jid} value={item.jid}>
+                        {item.name} ({item.isGroup ? 'Group' : 'User'})
+                      </option>
+                    ))}
+                  </select>
+                  <small>
+                    Hold Ctrl (or Cmd on Mac) to select multiple recipients.
+                    <br />
+                    Selected recipients: {selectedJids.length}
+                  </small>
                 </div>
               )}
               
@@ -264,12 +319,10 @@ const UserManagement = () => {
                         ...broadcastFilter,
                         isGroup: e.target.checked
                       })}
-                      disabled={loading}
+                      disabled={broadcastLoading}
                     />
                     <label htmlFor="includeGroups">Include groups</label>
                   </div>
-                  
-                  {/* Additional filters could be added here, e.g. tags */}
                 </div>
               )}
             </div>
@@ -277,9 +330,15 @@ const UserManagement = () => {
             <button 
               type="submit" 
               className="submit-button"
-              disabled={loading || !broadcastMessage.trim()}
+              disabled={broadcastLoading || !broadcastMessage.trim() || (selectedJids.length === 0 && activeJids.length === 0)}
             >
-              <FiSend /> Send Broadcast
+              {broadcastLoading ? (
+                "Sending..."
+              ) : (
+                <>
+                  <FiSend /> Send Broadcast
+                </>
+              )}
             </button>
           </form>
         </div>

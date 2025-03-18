@@ -49,18 +49,39 @@ const getChatHistory = async (jid, limit = 20) => {
   }
 };
 
-const addMessageToChat = async (jid, role, content) => {
+const addMessageToChat = async (jid, role, content, metadata = {}) => {
   try {
-    let chat = await Chat.findOne({ jid, conversationStatus: { $ne: 'ended' } }).sort({ lastUpdated: -1 }).limit(1);
+    // Find or create chat session
+    let chat = await Chat.findOne({ jid, conversationStatus: { $ne: 'ended' } })
+      .sort({ lastUpdated: -1 })
+      .limit(1);
+    
     if (!chat) {
-      chat = new Chat({ jid, messages: [], conversationStatus: 'active' });
+      // Create new chat session
+      chat = new Chat({
+        jid,
+        messages: [],
+        conversationStatus: 'active'
+      });
     }
-    chat.messages.push({ role, content, timestamp: new Date() });
+    
+    // Add message to chat with metadata
+    chat.messages.push({
+      role,
+      content,
+      timestamp: new Date(),
+      metadata
+    });
+    
+    // Update last updated timestamp
     chat.lastUpdated = new Date();
+    
+    // Save chat
     await chat.save();
     return chat;
   } catch (error) {
     console.error('Error adding message to chat:', error);
+    throw error;
   }
 };
 

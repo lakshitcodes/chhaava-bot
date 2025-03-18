@@ -5,7 +5,7 @@ const { sendMessage, sendBroadcast } = require('../services/baileys');
 // Get all users
 const getUsers = async (req, res) => {
   try {
-    const { search, isGroup, limit = 50, page = 1 } = req.query;
+    const { search, isGroup, isActive, limit = 50, page = 1 } = req.query;
     
     // Build query
     const query = {};
@@ -20,6 +20,10 @@ const getUsers = async (req, res) => {
     
     if (isGroup !== undefined) {
       query.isGroup = isGroup === 'true';
+    }
+    
+    if (isActive !== undefined) {
+      query.isActive = isActive === 'true';
     }
     
     // Calculate pagination
@@ -78,7 +82,7 @@ const getUser = async (req, res) => {
 // Create new user
 const createUser = async (req, res) => {
   try {
-    const { jid, name, isGroup } = req.body;
+    const { jid, name, isGroup, isActive } = req.body;
     
     // Validate JID format
     if (!jid.includes('@')) {
@@ -103,7 +107,8 @@ const createUser = async (req, res) => {
       jid,
       name: name || '',
       isGroup: isGroup || false,
-      phone: jid.split('@')[0]
+      phone: jid.split('@')[0],
+      isActive: isActive || false,  // Include isActive flag
     });
     
     res.status(201).json({
@@ -122,7 +127,7 @@ const createUser = async (req, res) => {
 // Update user
 const updateUser = async (req, res) => {
   try {
-    const { name, tags, active } = req.body;
+    const { name, tags, active, isActive } = req.body;
     
     // Find user
     const user = await User.findOne({ jid: req.params.jid });
@@ -138,6 +143,7 @@ const updateUser = async (req, res) => {
     if (name !== undefined) user.name = name;
     if (tags !== undefined) user.tags = tags;
     if (active !== undefined) user.active = active;
+    if (isActive !== undefined) user.isActive = isActive; // Update isActive flag
     
     // Save user
     await user.save();
@@ -148,6 +154,39 @@ const updateUser = async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating user:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server Error'
+    });
+  }
+};
+
+// Toggle user active status
+const toggleUserActive = async (req, res) => {
+  try {
+    // Find user
+    const user = await User.findOne({ jid: req.params.jid });
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
+    // Toggle isActive flag
+    user.isActive = !user.isActive;
+    
+    // Save user
+    await user.save();
+    
+    res.status(200).json({
+      success: true,
+      data: user,
+      message: `User ${user.isActive ? 'activated' : 'deactivated'} for bot responses`
+    });
+  } catch (error) {
+    console.error('Error toggling user active status:', error);
     res.status(500).json({
       success: false,
       error: 'Server Error'
@@ -228,6 +267,10 @@ const sendBroadcastMessage = async (req, res) => {
         query.isGroup = filter.isGroup;
       }
       
+      if (filter.isActive !== undefined) {
+        query.isActive = filter.isActive;
+      }
+      
       if (filter.tags && filter.tags.length > 0) {
         query.tags = { $in: filter.tags };
       }
@@ -236,10 +279,10 @@ const sendBroadcastMessage = async (req, res) => {
       const users = await User.find(query).select('jid');
       targetJids = users.map(user => user.jid);
     } else {
-      // Default to all active individual users
+      // Default to all active, bot-enabled users
       const users = await User.find({ 
         active: true,
-        isGroup: false
+        isActive: true
       }).select('jid');
       
       targetJids = users.map(user => user.jid);
@@ -269,11 +312,42 @@ const sendBroadcastMessage = async (req, res) => {
   }
 };
 
+// Get all active JIDs for broadcasting
+const getActiveJids = async (req, res) => {
+  try {
+    // Find all active users that the bot should respond to
+    const users = await User.find({ 
+      active: true,
+      isActive: true 
+    }).select('jid name isGroup');
+    
+    const jids = users.map(user => ({
+      jid: user.jid,
+      name: user.name || user.jid.split('@')[0],
+      isGroup: user.isGroup
+    }));
+    
+    res.status(200).json({
+      success: true,
+      count: jids.length,
+      data: jids
+    });
+  } catch (error) {
+    console.error('Error getting active JIDs:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server Error'
+    });
+  }
+};
+
 module.exports = {
   getUsers,
   getUser,
   createUser,
   updateUser,
+  toggleUserActive,
   sendMessageToUser,
-  sendBroadcastMessage
+  sendBroadcastMessage,
+  getActiveJids
 };

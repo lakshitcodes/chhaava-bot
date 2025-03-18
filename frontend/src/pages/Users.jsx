@@ -1,8 +1,9 @@
 // frontend/src/pages/Users.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { FiSearch, FiRefreshCw, FiMessageSquare, FiEdit2, FiUser, FiUsers } from 'react-icons/fi';
-import UserManagement from '../components/UserManagement';
+import { FiSearch, FiRefreshCw, FiMessageSquare, FiEdit2, FiUser, FiUsers, 
+         FiCheckCircle, FiXCircle, FiFilter } from 'react-icons/fi';
+import WhitelistManagement from '../components/WhitelistManagement';
 import ChatHistory from '../components/ChatHistory';
 import { API_URL } from '../config';
 
@@ -11,6 +12,7 @@ const Users = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [userType, setUserType] = useState('');
+  const [whitelistFilter, setWhitelistFilter] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
   const [chatHistory, setChatHistory] = useState(null);
   const [viewingManagement, setViewingManagement] = useState(false);
@@ -34,10 +36,34 @@ const Users = () => {
       
       if (search) params.append('search', search);
       if (userType) params.append('isGroup', userType === 'groups');
+      if (whitelistFilter) params.append('whitelisted', whitelistFilter === 'whitelisted');
       
       const res = await axios.get(`${API_URL}/api/users?${params.toString()}`);
       
-      setUsers(res.data.data || []);
+      // If we need to check whitelist status separately because it's now in a different API
+      if (res.data.data && res.data.data.length > 0) {
+        // For each user, check their whitelist status
+        const usersWithWhitelistStatus = await Promise.all(res.data.data.map(async (user) => {
+          try {
+            const whitelistCheck = await axios.get(`${API_URL}/api/whitelist/check/${user.jid}`);
+            return {
+              ...user,
+              whitelisted: whitelistCheck.data.isWhitelisted
+            };
+          } catch (err) {
+            console.error(`Error checking whitelist status for ${user.jid}:`, err);
+            return {
+              ...user,
+              whitelisted: false // Default to not whitelisted if check fails
+            };
+          }
+        }));
+        
+        setUsers(usersWithWhitelistStatus);
+      } else {
+        setUsers(res.data.data || []);
+      }
+      
       setTotalPages(res.data.pages || 1);
       setLoading(false);
     } catch (error) {
@@ -49,7 +75,7 @@ const Users = () => {
   // Initial fetch and when filters/page change
   useEffect(() => {
     fetchUsers();
-  }, [page, userType]);
+  }, [page, userType, whitelistFilter]);
   
   // Search handler
   const handleSearch = (e) => {
@@ -118,7 +144,7 @@ const Users = () => {
   return (
     <div className="users-page">
       <div className="page-header">
-        <h1>User Management</h1>
+        <h1>User & Whitelist Management</h1>
         <div className="header-actions">
           <button 
             className={`view-toggle ${!viewingManagement ? 'active' : ''}`}
@@ -130,13 +156,13 @@ const Users = () => {
             className={`view-toggle ${viewingManagement ? 'active' : ''}`}
             onClick={() => setViewingManagement(true)}
           >
-            <FiEdit2 /> Manage Users
+            <FiEdit2 /> Manage Whitelist
           </button>
         </div>
       </div>
       
       {viewingManagement ? (
-        <UserManagement onUserAdded={fetchUsers} />
+        <WhitelistManagement onWhitelistUpdated={fetchUsers} />
       ) : (
         <>
           <div className="filters-bar">
@@ -169,6 +195,21 @@ const Users = () => {
               </select>
             </div>
             
+            <div className="filter-group">
+              <label>Whitelist Status</label>
+              <select 
+                value={whitelistFilter} 
+                onChange={(e) => {
+                  setWhitelistFilter(e.target.value);
+                  setPage(1); // Reset to first page on filter change
+                }}
+              >
+                <option value="">All Users</option>
+                <option value="whitelisted">Whitelisted Only</option>
+                <option value="not-whitelisted">Not Whitelisted</option>
+              </select>
+            </div>
+            
             <button className="refresh-button" onClick={fetchUsers}>
               <FiRefreshCw /> Refresh
             </button>
@@ -187,7 +228,9 @@ const Users = () => {
                       <thead>
                         <tr>
                           <th>Name/Phone</th>
+                          <th>JID</th>
                           <th>Type</th>
+                          <th>Whitelist</th>
                           <th>Last Active</th>
                           <th>Actions</th>
                         </tr>
@@ -210,10 +253,22 @@ const Users = () => {
                                 </div>
                               </div>
                             </td>
+                            <td className="jid-cell">{user.jid}</td>
                             <td>
                               <span className={`type-badge ${user.isGroup ? 'group' : 'individual'}`}>
                                 {user.isGroup ? 'Group' : 'Individual'}
                               </span>
+                            </td>
+                            <td>
+                              {user.whitelisted ? (
+                                <span className="whitelist-badge whitelisted">
+                                  <FiCheckCircle /> Whitelisted
+                                </span>
+                              ) : (
+                                <span className="whitelist-badge not-whitelisted">
+                                  <FiXCircle /> Not Whitelisted
+                                </span>
+                              )}
                             </td>
                             <td>
                               {new Date(user.lastInteraction).toLocaleString()}

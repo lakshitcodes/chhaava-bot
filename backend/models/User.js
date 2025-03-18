@@ -20,6 +20,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  isActive: {
+    type: Boolean,
+    default: false,  // Explicitly specify if bot should respond to this JID
+  },
   metadata: {
     type: Object,
     default: {},

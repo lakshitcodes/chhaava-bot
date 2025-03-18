@@ -9,10 +9,10 @@ const path = require('path');
 const userRoutes = require('./routes/userRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const inquiryRoutes = require('./routes/inquiryRoutes');
+const whitelistRoutes = require('./routes/whitelistRoutes'); 
 
 // Initialize WhatsApp service
 const { initWhatsApp } = require('./services/baileys');
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/whatsapp-chatbot';
 
 // Load environment variables
 dotenv.config();
@@ -27,14 +27,45 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Connect to MongoDB
-mongoose.connect(MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// Routes
+// Routes - IMPORTANT: Mount whitelist routes at a SEPARATE path
 app.use('/api/users', userRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/inquiries', inquiryRoutes);
+app.use('/api/whitelist', whitelistRoutes); // CHANGED: Now mounted at /api/whitelist
+
+// Add debugging endpoint
+app.get('/api/debug/routes', (req, res) => {
+  const routes = [];
+  app._router.stack.forEach(middleware => {
+    if (middleware.route) {
+      routes.push({
+        path: middleware.route.path,
+        methods: Object.keys(middleware.route.methods)
+      });
+    } else if (middleware.name === 'router') {
+      middleware.handle.stack.forEach(handler => {
+        if (handler.route) {
+          const path = handler.route.path;
+          const basePath = middleware.regexp.toString()
+            .replace('\\^', '')
+            .replace('\\/?(?=\\/|$)', '')
+            .replace(/\\\//g, '/');
+          
+          routes.push({
+            path: basePath + path,
+            methods: Object.keys(handler.route.methods)
+          });
+        }
+      });
+    }
+  });
+  
+  res.json(routes);
+});
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {
