@@ -1,44 +1,57 @@
-# 🤖 ChhavaBot – RAG WhatsApp Chatbot
+# 🤖 ChhavaBot: RAG WhatsApp Chatbot
 
-ChhavaBot is a **Retrieval-Augmented Generation (RAG)** powered WhatsApp chatbot designed to deliver real-time, intelligent, and context-aware interactions. Built with a streamlined tech stack, it automates core services like car service bookings, test drive scheduling, and emergency assistance — all through WhatsApp.
+ChhavaBot is an AI-powered WhatsApp chatbot built to automate car service bookings, test drives, and emergency assistance. Utilizing Retrieval-Augmented Generation (RAG), it delivers context-aware and real-time responses for a seamless customer experience.
 
-## 🚀 Tech Stack
+---
 
-- **Flask** – Lightweight Python web framework for API and backend logic  
-- **Baileys.js** – WhatsApp Web API for sending/receiving messages  
-- **Groq** – High-performance inference engine powering fast and context-rich LLM responses  
+## 📚 Table of Contents
+- Project Overview
+- Features
+- Tech Stack
+- Architecture Overview
+- WhatsApp & Baileys.js Setup
+- Running ChhavaBot Locally
+- Screenshots
+- License
 
-## 🔧 Key Features
+---
 
-- **🔍 RAG-Powered Intelligence**  
-  Combines LLMs with retrieval capabilities to deliver accurate, up-to-date answers based on real-world data.
+## 📌 Project Overview
 
-- **📅 Service Booking Automation**  
-  Effortlessly schedule car service appointments through a simple WhatsApp chat.
+ChhavaBot simplifies the interaction between users and automotive service providers through an intelligent WhatsApp interface. The chatbot offers responsive, smart, and secure communication using the RAG pipeline powered by Groq.
 
-- **🚗 Test Drive Scheduling**  
-  Users can easily book test drives with real-time confirmations.
+---
 
-- **🚨 Emergency Assistance**  
-  Provides instant support for roadside emergencies or technical help.
+## 👥 User Roles
 
-- **💬 Real-Time WhatsApp Integration**  
-  Seamless 2-way interaction using Baileys.js with persistent context and user tracking.
+- **Customer**: Interacts via WhatsApp to request services, book test drives, or seek help.
+- **Admin/Operator** *(optional)*: Can view service logs or intervene when necessary (future roadmap feature).
 
-## ⚙️ How It Works
+---
 
-1. **User initiates a conversation on WhatsApp.**  
-2. **Baileys.js** receives and forwards the message to a **Flask API**.  
-3. **Flask** handles the message logic and queries relevant data via RAG using **Groq**.  
-4. The chatbot sends back a tailored, human-like response in real time.
+## 🧠 Core Functionalities
 
-## 🛠️ Getting Started
+- **Real-Time Conversations**: Handles incoming WhatsApp messages using Baileys.js.
+- **RAG-based Responses**: Fetches relevant context and uses a language model for precise and conversational replies.
+- **Car Service Booking**: Users can schedule maintenance and general services.
+- **Test Drive Scheduling**: Book a test drive directly from WhatsApp with confirmation messages.
+- **Emergency Assistance**: Instantly triggers help for breakdowns or urgent support.
+- **Session Context**: Keeps short-term memory to maintain context during chats.
 
-> Coming soon: Detailed setup guide, deployment instructions, and API documentation.
+---
 
-In the meantime, make sure you have:
-- A working WhatsApp number/session
-- Python & Node.js installed
-- Access to a Groq-compatible model
+## 🧰 Tech Stack
 
-Built with ❤️ for seamless automotive support and smarter customer experiences.
+- **Flask** – Backend framework for routing, processing, and response handling.
+- **Baileys.js** – WhatsApp Web API wrapper for Node.js to send and receive messages.
+- **Groq** – High-speed inference engine for powering RAG and LLM responses.
+- **SQLite/MySQL** – (Optional) For logging conversations and booking history.
+
+---
+
+## 🏗️ Architecture Overview
+
+```txt
+[WhatsApp User] <--> [Baileys.js] <--> [Flask API] <--> [RAG Engine (Groq)] <--> [Response]
+                                              |
+                                              +--> [Database (Bookings, Logs)]
