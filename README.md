@@ -56,3 +56,54 @@ ChhavaBot simplifies the interaction between users and automotive service provid
                                               |
                                               +--> [Database (Bookings, Logs)]
 ```
+## 🔧 WhatsApp & Baileys.js Setup
+
+ChhavaBot uses **Baileys.js** to interface with WhatsApp Web and handle message sending and receiving. Follow the steps below to configure it:
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/your-username/chhavabot.git
+cd chhavabot
+```
+### 2. Navigate to WhatsApp Handler
+```bash
+cd whatsapp-handler
+```
+### 3. Install Node.js Dependencies
+```bash
+npm install
+```
+### 4. Start WhatsApp Session
+```bash
+node index.js
+```
+📱 Scan the QR code using WhatsApp:
+
+Open WhatsApp > Settings > Linked Devices > Link a Device
+
+
+---
+
+## 🚀 Running ChhavaBot Locally
+
+Make sure you have **Python 3.8+** and **Node.js** installed.
+
+### 1. Install Python dependencies
+
+```bash
+pip install -r requirements.txt
+```
+### 2. Start the Flask backend
+```bash
+python app.py
+```
+### 3. Start the WhatsApp handler
+In a separate terminal:
+```bash
+cd whatsapp-handler
+node index.js
+```
+## 🖼️ Screenshots
+
+Built with 🧠 and ❤️ to revolutionize car service experiences using AI.
