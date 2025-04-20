@@ -12,7 +12,7 @@ ChhavaBot is an AI-powered WhatsApp chatbot built to automate car service bookin
 - WhatsApp & Baileys.js Setup
 - Running ChhavaBot Locally
 - Screenshots
-- License
+
 
 ---
 
