@@ -55,3 +55,62 @@ ChhavaBot simplifies the interaction between users and automotive service provid
 [WhatsApp User] <--> [Baileys.js] <--> [Flask API] <--> [RAG Engine (Groq)] <--> [Response]
                                               |
                                               +--> [Database (Bookings, Logs)]
+```
+🔧 WhatsApp & Baileys.js Setup
+ChhavaBot uses Baileys.js to interface with WhatsApp Web and handle message sending and receiving. Follow the steps below to configure it:
+
+1. Clone the Repository
+bash
+Copy
+Edit
+git clone https://github.com/your-username/chhavabot.git
+cd chhavabot
+2. Navigate to WhatsApp Handler
+bash
+Copy
+Edit
+cd whatsapp-handler
+This folder contains all the code related to WhatsApp message handling using Baileys.js.
+
+3. Install Node.js Dependencies
+Make sure you have Node.js installed. Then run:
+
+bash
+Copy
+Edit
+npm install
+This will install @whiskeysockets/baileys and other required packages.
+
+4. Start WhatsApp Session
+Run the WhatsApp listener script:
+
+bash
+Copy
+Edit
+node index.js
+On the first run, it will generate a QR code in the terminal.
+
+Scan the QR code using your WhatsApp account:
+
+Open WhatsApp on your phone.
+
+Go to Settings > Linked Devices.
+
+Tap on Link a Device and scan the QR code displayed in your terminal.
+
+Once connected, you’ll see a message like:
+
+pgsql
+Copy
+Edit
+✅ WhatsApp session started!
+A session file will be saved locally to maintain the connection even after restarting the script.
+
+🧪 Testing WhatsApp Messaging
+Try sending a message like:
+
+css
+Copy
+Edit
+Hi, I want to book a service.
+If everything is set up correctly, the bot will respond using the Flask API and Groq-powered RAG engine to provide a relevant reply.
